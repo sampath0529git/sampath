@@ -75,7 +75,7 @@ async def handle_files(client, message):
             srt_path = await message.download()
             
             video_path = user_videos[chat_id]
-            out_path = f"CineVibe_LK_{message.message_id}.mp4"
+            out_path = f"CineVibe_LK_{message_id}.mp4"
 
             await msg.edit_text("⚙️ වීඩියෝ එකට Subtitles එකතු කරමින් පවතී... මේකට තත්පර කිහිපයක් යයි.")
             
