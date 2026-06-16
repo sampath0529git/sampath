@@ -4,21 +4,26 @@ import subprocess
 from pyrogram import Client, filters
 
 # Heroku වලින් Variables ගන්නවා
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+API_ID = int(os.environ.get("API_ID", 0))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
-app = Client("advanced_subtitle_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+app = Client("fast_subtitle_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 user_videos = {}
 
-# Progress පෙන්නන ෆන්ක්ෂන් එක
-def progress(current, total, msg, text):
-    percent = f"{current * 100 / total:.1f}%"
-    try:
-        msg.edit_text(f"{text}\n⏳ Progress: {percent}")
-    except:
-        pass
+# Progress එක වෙලාවත් එක්ක පාලනය කිරීම (වේගය වැඩි කිරීමට)
+def progress(current, total, msg, text, start_time):
+    percent = current * 100 / total
+    current_time = time.time()
+    
+    # මැසේජ් එක Edit කරන්නේ තත්පර 3කට සැරයක් විතරයි
+    if current_time - start_time[0] > 3:
+        try:
+            msg.edit_text(f"{text}\n⏳ Progress: {percent:.1f}%")
+            start_time[0] = current_time  # අලුත් වෙලාව සේව් කරනවා
+        except:
+            pass
 
 @app.on_message(filters.video | filters.document)
 def handle_files(client, message):
@@ -28,7 +33,14 @@ def handle_files(client, message):
     # වීඩියෝ එකක් ආවොත්
     if message.video or (message.document and message.document.file_name.endswith(('.mp4', '.mkv', '.avi'))):
         msg.edit_text("📥 වීඩියෝ එක ඩවුන්ලෝඩ් වෙමින් පවතී...")
-        file_path = message.download(progress=progress, progress_args=(msg, "📥 වීඩියෝ එක ඩවුන්ලෝඩ් වෙමින් පවතී..."))
+        
+        # ඩවුන්ලෝඩ් පටන් ගන්න වෙලාව සටහන් කරගන්නවා
+        start_time = [time.time()] 
+        
+        file_path = message.download(
+            progress=progress, 
+            progress_args=(msg, "📥 වීඩියෝ එක ඩවුන්ලෝඩ් වෙමින් පවතී...", start_time)
+        )
         user_videos[chat_id] = file_path
         msg.edit_text("✅ වීඩියෝ එක හරි! දැන් ඒකට අදාල .srt (Subtitle) ෆයිල් එක එවන්න.")
         
@@ -38,14 +50,18 @@ def handle_files(client, message):
             msg.edit_text("⚠️ මුලින්ම වීඩියෝ එකක් එවලා ඉන්න මචං.")
             return
 
-        srt_path = message.download(progress=progress, progress_args=(msg, "📥 Subtitle ෆයිල් එක ඩවුන්ලෝඩ් වෙමින් පවතී..."))
+        start_time = [time.time()]
+        srt_path = message.download(
+            progress=progress, 
+            progress_args=(msg, "📥 Subtitle ෆයිල් එක ඩවුන්ලෝඩ් වෙමින් පවතී...", start_time)
+        )
         video_path = user_videos[chat_id]
         out_path = f"CineVibe_LK_{message.message_id}.mp4"
 
         msg.edit_text("⚙️ වීඩියෝ එකට Subtitles එකතු කරමින් පවතී... මේකට පොඩි වෙලාවක් යයි.")
         
         try:
-            # FFmpeg Command එක (Softsub)
+            # FFmpeg Command එක
             command = [
                 "ffmpeg", "-y", "-i", video_path, "-i", srt_path,
                 "-c", "copy", "-c:s", "mov_text", out_path
@@ -54,14 +70,14 @@ def handle_files(client, message):
             
             msg.edit_text("📤 Subtitle දාපු වීඩියෝ එක අප්ලෝඩ් කරමින් පවතී...")
             
-            # Custom Branding Caption එක
             caption_text = "🎬 **CineVibe LK** | Action • Comedy • Drama\n\nමෙන්න Subtitles එක්ක වීඩියෝ එක! 🍿"
             
+            start_time_up = [time.time()]
             message.reply_video(
                 video=out_path, 
                 caption=caption_text,
                 progress=progress, 
-                progress_args=(msg, "📤 Subtitle දාපු වීඩියෝ එක අප්ලෝඩ් කරමින් පවතී...")
+                progress_args=(msg, "📤 Subtitle දාපු වීඩියෝ එක අප්ලෝඩ් කරමින් පවතී...", start_time_up)
             )
             msg.delete()
             
@@ -78,5 +94,5 @@ def handle_files(client, message):
     else:
         msg.edit_text("⚠️ කරුණාකරලා වීඩියෝ එකක් (MP4/MKV) හෝ .srt ෆයිල් එකක් පමණක් එවන්න.")
 
-print("🚀 Improved Subtitle Bot සාර්ථකව පටන් ගත්තා!")
+print("🚀 Fast Subtitle Bot සාර්ථකව පටන් ගත්තා!")
 app.run()
